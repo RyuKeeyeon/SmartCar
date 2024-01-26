@@ -1,0 +1,18 @@
+<!-- web_control/templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자동차 조종</title>
+</head>
+<body>
+    <h1>자동차 조종</h1>
+    <button onclick="sendCommand('forward')">앞으로</button>
+    <button onclick="sendCommand('backward')">뒤로</button>
+    <button onclick="sendCommand('left')">좌회전</button>
+    <button onclick="sendCommand('right')">우회전</button>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

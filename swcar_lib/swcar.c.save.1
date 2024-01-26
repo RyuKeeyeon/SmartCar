@@ -1,0 +1,177 @@
+/*********************************************************************
+    swcar.c (Rev 0.10)
+
+    SmartCar Main
+
+    Copyright(C)
+
+    Programmed by  Stellar Respree
+*********************************************************************/
+
+#include <global.h>
+#include "local.h"
+#include "sw_type.h"
+#include "sio.h"
+#include "gps.h"
+#include <wiringPi.h>
+
+
+// -------------------------------------------------------------------
+//	Type Definition
+// -------------------------------------------------------------------
+#define USLEEP_TIME		(1 * 1000 * 1000)
+#define WRITE_INTERVAL	10
+
+
+// -------------------------------------------------------------------
+//	Private Function
+// -------------------------------------------------------------------
+int     ParseArg(int argc, char* argv[]);
+
+
+// -------------------------------------------------------------------
+//	Global Variable
+// -------------------------------------------------------------------
+static	SWBOX*	pMM;
+char	m_sDevID[1024] 		= {0};
+char	m_sURL	[1024] 		= {0};
+char	m_sServerAddr[1024] = "smartcars.cafe24.com";
+char 	m_sServerPath[1204] = "/smartcar";
+
+
+extern int iPwmPeekCount;
+// -------------------------------------------------------------------
+//	Main Function
+// -------------------------------------------------------------------
+int		main(int argc, char* argv[])
+{
+	int		iTest;
+	int		iSecond;
+	int		iWriteTime = -1;
+
+	int		iRun = 0;
+	int		iRet;
+	char*	pLogW;
+	char*	pLogR;
+
+	char*	pLogMM	= "";
+	char*	pLogMS	= "";
+
+	char*	pLogGPS;
+
+	char*	pSend;
+	char	sLog[1024];
+
+
+	printf("SIO Initializing....\n");
+
+	pMM = SIO_Init(FALSE);
+	printf("SIO Initialize Done.\n");
+
+	iTest = 2;
+
+	int		iMotor = 0;
+	int		iAccel = 0;
+	int		iServo;
+
+	while (TRUE) {
+		++iRun;
+
+		if ( (iTest == 1) && ((iRun % 10) == 1) ) {
+			sLog[0] = 0;
+			SIO_TestWriteLED();
+			sprintf(sLog + strlen(sLog), "LED%s  ", SIO_GetLastReadLog());
+			SIO_ReadSwitch();
+			sprintf(sLog + strlen(sLog), "SW%s  ", SIO_GetLastReadLog());
+
+			SIO_ReadIR();
+			sprintf(sLog + strlen(sLog), "IR%s  ", SIO_GetLastReadLog());
+			SIO_ReadDistUS(TRUE);
+			sprintf(sLog + strlen(sLog), "FUS%s  ", SIO_GetLastReadLog());
+			SIO_ReadDistUS(FALSE);
+			sprintf(sLog + strlen(sLog), "RUS%s  ", SIO_GetLastReadLog());
+///			SIO_ReadDistLS();
+///			sprintf(sLog + strlen(sLog), "LS%s  ", SIO_GetLastReadLog());
+	 		printf("%4d %s\n", iRun, sLog);
+		}
+
+		if ( iTest == 2 ) {
+			sLog[0] = 0;
+			SIO_TestWriteLED();
+			sprintf(sLog + strlen(sLog), "LED%s  ", SIO_GetLastReadLog());
+
+
+			SIO_BrakeBLDC(TRUE);
+
+			// Accel Init Value
+			if ( iAccel == 0 )	iAccel = 4;
+
+			// Range is 0 to 100 to 0 to -100 to 0
+			{
+				if ( (iRun % 4) == 0 ) {
+					iMotor = iMotor + iAccel;
+					if ( iMotor >=  100 )	iAccel = -iAccel;
+					if ( iMotor <= -100 )	iAccel = -iAccel;
+				}
+
+				SIO_WriteBLDC(iMotor);
+
+				pLogMM = SIO_GetLastReadLog();
+			}
+
+			// Range is 0 to 100 to 0
+			{
+				iServo = iRun % 200;
+				if (iServo > 100) iServo = 200 - iServo;
+
+				SIO_WriteServo(100, iServo);
+				printf(" S%d %d\n", 100, iServo);
+				pLogMS = SIO_GetLastReadLog();
+
+	 			printf("%4d %s  MM%s  SV%s\n", iRun, sLog, pLogMM, pLogMS);
+			}
+		}
+
+		if ( iTest == 3 ) {
+			pLogGPS = SIO_ReadGyro(FALSE);
+
+	 		printf("%4d ZYRO %s\n", iRun, pLogGPS);
+		}
+
+		if ( iTest == 4 ) {
+			pLogGPS = SIO_ReadGPS();
+
+	 		printf("%4d GPS %s\n", iRun, pLogGPS);
+		}
+
+		if ( iTest == 5 ) {
+			SIO_ActivateLidar(iRun < 3);
+			printf("LID:%s\n", SIO_ReadLidar());
+
+	 		printf("%4d %s\n", iRun, sLog);
+
+			if (iRun == 1) {
+				for ( int i = 0 ; i < pMM->iCOM ; i++ ) {
+					if ( pMM->sCOM[i] == 0x0a ) continue;
+
+					printf("%c", pMM->sCOM[i]);
+					if ( pMM->sCOM[i] == 0x0d ) printf("%c", 0x0a);
+				}
+				printf("\n\n");
+			}
+		}
+
+   		/// ==============================
+  	  	iSecond = time(NULL) % 86400;
+   		/// ==============================
+
+		if ( iTest == 5 ) {
+			usleep(1);
+		}
+		else {
+			usleep(USLEEP_TIME / 10);
+		}
+	}
+
+	return(TRUE);
+}
